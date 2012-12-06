@@ -1,0 +1,35 @@
+#!/bin/sh
+# For auto scp file to server
+
+# env variable
+PATH_CUR=`pwd`
+PATH_USR=`dirname ~`/`basename ~`
+SCP_CONFIG=""
+PATH_FILE="$PATH_CUR/$1"
+
+# detect .scp_config file
+while [[ "$PATH_CUR" != "$PATH_USR" ]]
+do
+    if [ -f "$PATH_CUR/.scp_config" ]; then
+        SCP_CONFIG="$PATH_CUR/.scp_config"
+        break
+    else
+        PATH_CUR=`echo $PATH_CUR | sed "s/\(\/.*\)\/[^\/]*/\1/g"`
+    fi
+done
+
+if [[ "$SCP_CONFIG" != "" ]]; then
+    echo "Found .scp_config at: $SCP_CONFIG"
+    SCP_HOST=`cat $SCP_CONFIG | grep "scp.host=" | sed "s/scp.host=//"`
+    SCP_USER=`cat $SCP_CONFIG | grep "scp.user=" | sed "s/scp.user=//"`
+    SCP_PASS=`cat $SCP_CONFIG | grep "scp.password=" | sed "s/scp.password=//"`
+    SCP_FROM_ROOT=`cat $SCP_CONFIG | grep "scp.from.root=" | sed "s/scp.from.root=//"`
+    SCP_FROM_ROOT=$(cd `dirname $SCP_CONFIG`;cd $SCP_FROM_ROOT;echo $PWD)
+    SCP_TO_ROOT=`cat $SCP_CONFIG | grep "scp.to.root=" | sed "s/scp.to.root=//"`
+    PATH_CUR=`pwd`
+    REL_PATH=${PATH_FILE##*$SCP_FROM_ROOT}
+    # scp to server
+    echo "Scp '$1' to '$SCP_USER@$SCP_HOST:$SCP_TO_ROOT/$REL_PATH'"
+    echo "spawn scp $PATH_FILE $SCP_USER@$SCP_HOST:$SCP_TO_ROOT/$REL_PATH;expect \"*assword*\";send \"$SCP_PASS\\n\";expect \"$\";send 1;expect \"#\"" | expect
+    echo "Done."
+fi

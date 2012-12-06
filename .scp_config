@@ -1,0 +1,5 @@
+scp.host=opsui.pp11.alipay.net
+scp.user=admin
+scp.password=opsui
+scp.from.root=./opsui/
+scp.to.root=/home/admin/build/
