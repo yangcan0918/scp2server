@@ -10,7 +10,7 @@
    > * `scp.from.root` evaluate relative path of file depend on this item. it start with the relative path of `.scp_config` file;
    > * `scp.to.root` the path you want to place, root of your build path;
 * edit your .gvimrc or .vimrc to add the this line:
-   > au BufWritePost \*.vm exec "!{PATH}/scp_to_server %" 
+   > au BufWritePost \*.vm exec "!{PATH}/scp2server %" 
 * replace {PATH} to your local path, change "\*.vm" to add or replace your file format;
 
 ## Have fun..
