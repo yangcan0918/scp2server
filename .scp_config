@@ -1,5 +1,5 @@
-scp.host=opsui.pp11.alipay.net
+scp.host=x.cmsc
 scp.user=admin
-scp.password=opsui
-scp.from.root=./opsui/
-scp.to.root=/home/admin/build/
+scp.password=123456
+scp.from.root=./
+scp.to.root=/home/admin/test/

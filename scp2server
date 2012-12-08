@@ -1,11 +1,33 @@
 #!/bin/sh
+# 
 # For auto scp file to server
+# param: -f used to copy the hole scp.from.root directory.
+# param: -i used to ignore files when use -f.
+# param: -e used to allow files with specifid extensions.
+# 
+# Author: wsvn53@gmail.com
 
 # env variable
 PATH_CUR=`pwd`
 PATH_USR=`dirname ~`/`basename ~`
 SCP_CONFIG=""
 PATH_FILE="$PATH_CUR/$1"
+FULL_COPY=0
+
+# read options
+while getopts "fi:e:h" OPTNAME
+do
+    case $OPTNAME in
+        f) FULL_COPY=1;;
+        i) IGNORE_MATCH=$OPTARG;;
+        e) EXT_MATCH=$OPTARG;;
+    esac
+done
+# --ignore parameter
+if [[ "$IGNORE_MATCH" = "" ]];then
+    IGNORE_MATCH="/\.git\|/\.svn"
+fi
+IGNORE_MATCH=$IGNORE_MATCH"\|/\.scp_config"
 
 # detect .scp_config file
 while [[ "$PATH_CUR" != "$PATH_USR" ]]
@@ -18,6 +40,17 @@ do
     fi
 done
 
+function scp_to()
+{
+    PATH_FILE=$1
+    REL_PATH=${PATH_FILE##*$SCP_FROM_ROOT}
+    REMOTE_DIRNAME=`dirname $SCP_TO_ROOT$REL_PATH`
+    # mkdir on remote server
+    echo "spawn ssh $SCP_USER@$SCP_HOST \"mkdir -p $REMOTE_DIRNAME 2 >> /dev/null\";expect \"*assword*\";send \"$SCP_PASS\\n\";expect \"#\"" | expect >> /dev/null
+    # scp to server
+    echo "spawn scp $PATH_FILE $SCP_USER@$SCP_HOST:$SCP_TO_ROOT$REL_PATH;expect \"*assword*\";send \"$SCP_PASS\\n\";expect \"#\"" | expect
+}
+
 if [[ "$SCP_CONFIG" != "" ]]; then
     echo "Found .scp_config at: $SCP_CONFIG"
     SCP_HOST=`cat $SCP_CONFIG | grep "scp.host=" | sed "s/scp.host=//"`
@@ -27,9 +60,17 @@ if [[ "$SCP_CONFIG" != "" ]]; then
     SCP_FROM_ROOT=$(cd `dirname $SCP_CONFIG`;cd $SCP_FROM_ROOT;echo $PWD)
     SCP_TO_ROOT=`cat $SCP_CONFIG | grep "scp.to.root=" | sed "s/scp.to.root=//"`
     PATH_CUR=`pwd`
-    REL_PATH=${PATH_FILE##*$SCP_FROM_ROOT}
-    # scp to server
-    echo "Scp '$1' to '$SCP_USER@$SCP_HOST:$SCP_TO_ROOT/$REL_PATH'"
-    echo "spawn scp $PATH_FILE $SCP_USER@$SCP_HOST:$SCP_TO_ROOT/$REL_PATH;expect \"*assword*\";send \"$SCP_PASS\\n\";expect \"$\";send 1;expect \"#\"" | expect
-    echo "Done."
+    # if --full 
+    if [[ $FULL_COPY -eq 1 ]];then
+        for FILE in `find $SCP_FROM_ROOT | grep -v "$IGNORE_MATCH" | grep "$EXT_MATCH"`
+        do
+            if [ -f $FILE ];then
+                scp_to $FILE
+            fi
+        done
+    else
+        scp_to $PATH_FILE
+    fi
+    echo "-------------------------Done-------------------------"
+    exit 0
 fi
