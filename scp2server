@@ -4,6 +4,7 @@
 # param: -f used to copy the hole scp.from.root directory.
 # param: -i used to ignore files when use -f.
 # param: -e used to allow files with specifid extensions.
+# param: -c used to create a '.scp_config' sample file under current path.
 # 
 # Author: wsvn53@gmail.com
 
@@ -14,15 +15,46 @@ SCP_CONFIG=""
 PATH_FILE="$PATH_CUR/$1"
 FULL_COPY=0
 
+function create_scp_config()
+{
+    if [ ! -f ".scp_config" ];then
+        echo "scp.host=sample.scp2server.com\nscp.user=root\nscp.password=samplepassword\nscp.from.root=./\nscp.to.root=/root/sample/" >> .scp_config
+        echo "File '.scp_config' created."
+        exit 0
+    else
+        echo "File '.scp_config' exsit."
+    fi
+}
+
+function scp_to()
+{
+    PATH_FILE=$1
+    REL_PATH=${PATH_FILE##*$SCP_FROM_ROOT}
+    REMOTE_DIRNAME=`dirname $SCP_TO_ROOT$REL_PATH`
+    # mkdir on remote server
+    echo "spawn ssh $SCP_USER@$SCP_HOST \"mkdir -p $REMOTE_DIRNAME 2 >> /dev/null\";expect \"*assword*\";send \"$SCP_PASS\\n\";expect \"#\"" | expect >> /dev/null
+    # scp to server
+    echo "spawn scp $PATH_FILE $SCP_USER@$SCP_HOST:$SCP_TO_ROOT$REL_PATH;expect \"*assword*\";send \"$SCP_PASS\\n\";expect \"#\"" | expect
+}
+
 # read options
-while getopts "fi:e:h" OPTNAME
+while getopts "fi:e:hc" OPTNAME
 do
     case $OPTNAME in
         f) FULL_COPY=1;;
         i) IGNORE_MATCH=$OPTARG;;
         e) EXT_MATCH=$OPTARG;;
+        c) create_scp_config;exit 0;;
     esac
 done
+
+# no parameter, just create a .scp_config file
+if [ $# = 0 ];then
+    create_scp_config
+    echo "Nothing to do."
+    exit 0
+fi
+
 # --ignore parameter
 if [[ "$IGNORE_MATCH" = "" ]];then
     IGNORE_MATCH="/\.git\|/\.svn"
@@ -36,20 +68,9 @@ do
         SCP_CONFIG="$PATH_CUR/.scp_config"
         break
     else
-        PATH_CUR=`echo $PATH_CUR | sed "s/\(\/.*\)\/[^\/]*/\1/g"`
+        PATH_CUR=`cd $PATH_CUR;cd ..;echo $PWD`
     fi
 done
-
-function scp_to()
-{
-    PATH_FILE=$1
-    REL_PATH=${PATH_FILE##*$SCP_FROM_ROOT}
-    REMOTE_DIRNAME=`dirname $SCP_TO_ROOT$REL_PATH`
-    # mkdir on remote server
-    echo "spawn ssh $SCP_USER@$SCP_HOST \"mkdir -p $REMOTE_DIRNAME 2 >> /dev/null\";expect \"*assword*\";send \"$SCP_PASS\\n\";expect \"#\"" | expect >> /dev/null
-    # scp to server
-    echo "spawn scp $PATH_FILE $SCP_USER@$SCP_HOST:$SCP_TO_ROOT$REL_PATH;expect \"*assword*\";send \"$SCP_PASS\\n\";expect \"#\"" | expect
-}
 
 if [[ "$SCP_CONFIG" != "" ]]; then
     echo "Found .scp_config at: $SCP_CONFIG"
