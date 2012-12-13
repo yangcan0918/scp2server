@@ -32,7 +32,7 @@ function scp2serv()
     PATH_FILE=$1
     REL_PATH=${PATH_FILE##*$SCP_FROM_ROOT}
     REMOTE_DIRNAME=`dirname $SCP_TO_ROOT$REL_PATH`
-    INTERACT="expect {\n \"*assword*\" {\n send \"$SCP_PASS\\\\n\"\n exp_continue \n }\n \"dev/null\" {\n exit \n} \"fingerprint\" {\n send \"yes\\\\n\" \n send_user \"\\\\nadd fingerprint to known_hosts\" \n \n exp_continue \n} \n timeout {\n send_user \"Timeout. abort.\\\\n\" \n exit \n } \n }"
+    INTERACT="set timeout 30\nexpect {\n \"*assword*\" {\n send \"$SCP_PASS\\\\n\"\n exp_continue \n }\n \"dev/null\" {\n exit \n} \"fingerprint\" {\n send \"yes\\\\n\" \n send_user \"\\\\nadd fingerprint to known_hosts\" \n \n exp_continue \n} \n timeout {\n send_user \"Timeout. abort.\\\\n\" \n exit \n } \n }"
     if [[ $DEBUG_MODE -eq 1 ]];then
         HIDE_STR="SCP2SERVER_IS_RUNNING_IN_DEBUG_MODE"
         echo $HIDE_STR
