@@ -14,11 +14,12 @@ PATH_USR=`dirname ~`/`basename ~`
 SCP_CONFIG=""
 PATH_FILE="$PATH_CUR/$1"
 FULL_COPY=0
+DEBUG_MODE=0
 
 function create_scp_config()
 {
     if [ ! -f ".scp_config" ];then
-        echo "scp.host=sample.scp2server.com\nscp.user=root\nscp.password=samplepassword\nscp.from.root=./\nscp.to.root=/root/sample/" >> .scp_config
+        echo "scp.host=sample.scp2server.com\nscp.user=root\nscp.password=samplepassword\nscp.from=./\nscp.to=/root/sample/\debug.mode=0" >> .scp_config
         echo "File '.scp_config' created."
         exit 0
     else
@@ -26,27 +27,25 @@ function create_scp_config()
     fi
 }
 
-function scp_to()
+function scp2serv()
 {
     PATH_FILE=$1
     REL_PATH=${PATH_FILE##*$SCP_FROM_ROOT}
     REMOTE_DIRNAME=`dirname $SCP_TO_ROOT$REL_PATH`
+    INTERACT="expect {\n \"*assword*\" {\n send \"$SCP_PASS\\\\n\"\n exp_continue \n }\n \"dev/null\" {\n exit \n} \"fingerprint\" {\n send \"yes\\\\n\" \n send_user \"\\\\nadd fingerprint to known_hosts\" \n \n exp_continue \n} \n timeout {\n send_user \"Timeout. abort.\\\\n\" \n exit \n } \n }"
+    if [[ $DEBUG_MODE -eq 1 ]];then
+        HIDE_STR="SCP2SERVER_IS_RUNNING_IN_DEBUG_MODE"
+        echo $HIDE_STR
+    else
+        HIDE_STR="ssh\|$SCP_USER\|$SCP_HOST\|yes/no\|fingerprint"
+    fi
     # mkdir on remote server
-    echo "spawn ssh $SCP_USER@$SCP_HOST \"mkdir -p $REMOTE_DIRNAME 2 >> /dev/null\";expect \"*assword*\";send \"$SCP_PASS\\n\";expect \"#\"" | expect >> /dev/null
+    if [[ $DEBUG_MODE -eq 1 ]];then echo "1) run 'mkdir -p' to create full path if not exsit";fi
+    echo "set timeout 60\n spawn ssh $SCP_USER@$SCP_HOST \"mkdir -p $REMOTE_DIRNAME 2 >> /dev/null\"\n $INTERACT" | expect | grep -v "$HIDE_STR"
     # scp to server
-    echo "spawn scp $PATH_FILE $SCP_USER@$SCP_HOST:$SCP_TO_ROOT$REL_PATH;expect \"*assword*\";send \"$SCP_PASS\\n\";expect \"#\"" | expect
+    if [[ $DEBUG_MODE -eq 1 ]];then echo "2) run scp to copy file to server";fi
+    echo "spawn scp $PATH_FILE $SCP_USER@$SCP_HOST:$SCP_TO_ROOT$REL_PATH\n $INTERACT" | expect | grep -v "$HIDE_STR"
 }
-
-# read options
-while getopts "fi:e:hc" OPTNAME
-do
-    case $OPTNAME in
-        f) FULL_COPY=1;;
-        i) IGNORE_MATCH=$OPTARG;;
-        e) EXT_MATCH=$OPTARG;;
-        c) create_scp_config;exit 0;;
-    esac
-done
 
 # no parameter, just create a .scp_config file
 if [ $# = 0 ];then
@@ -54,6 +53,18 @@ if [ $# = 0 ];then
     echo "Nothing to do."
     exit 0
 fi
+
+# read options
+while getopts "fi:e:hc" OPTNAME
+do
+    echo $OPTNAME
+    case $OPTNAME in
+        f) FULL_COPY=1;;
+        i) IGNORE_MATCH=$OPTARG;;
+        e) EXT_MATCH=$OPTARG;;
+        c) create_scp_config;exit 0;;
+    esac
+done
 
 # --ignore parameter
 if [[ "$IGNORE_MATCH" = "" ]];then
@@ -74,24 +85,27 @@ done
 
 if [[ "$SCP_CONFIG" != "" ]]; then
     echo "Found .scp_config at: $SCP_CONFIG"
-    SCP_HOST=`cat $SCP_CONFIG | grep "scp.host=" | sed "s/scp.host=//"`
-    SCP_USER=`cat $SCP_CONFIG | grep "scp.user=" | sed "s/scp.user=//"`
-    SCP_PASS=`cat $SCP_CONFIG | grep "scp.password=" | sed "s/scp.password=//"`
-    SCP_FROM_ROOT=`cat $SCP_CONFIG | grep "scp.from.root=" | sed "s/scp.from.root=//"`
+    CONFIG_VARS=`sed "s/\./_/" $SCP_CONFIG | sed "s/\.root=/=/"`
+    export $CONFIG_VARS
+    SCP_HOST=$scp_host
+    SCP_USER=$scp_user
+    SCP_PASS=$scp_password
+    SCP_FROM_ROOT=$scp_from
     SCP_FROM_ROOT=$(cd `dirname $SCP_CONFIG`;cd $SCP_FROM_ROOT;echo $PWD)
-    SCP_TO_ROOT=`cat $SCP_CONFIG | grep "scp.to.root=" | sed "s/scp.to.root=//"`
-    PATH_CUR=`pwd`
+    SCP_TO_ROOT=$scp_to
+    DEBUG_MODE=$debug_mode
+    PATH_CUR=$PWD
     # if --full 
     if [[ $FULL_COPY -eq 1 ]];then
         for FILE in `find $SCP_FROM_ROOT | grep -v "$IGNORE_MATCH" | grep "$EXT_MATCH"`
         do
             if [ -f $FILE ];then
-                scp_to $FILE
+                scp2serv $FILE
             fi
         done
     else
-        scp_to $PATH_FILE
+        scp2serv $PATH_FILE
     fi
-    echo "-------------------------Done-------------------------"
+    echo ">>---------------------------------Done------------------------------------<<"
     exit 0
 fi
