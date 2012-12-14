@@ -22,9 +22,7 @@
            "working_dir": "${file_path}",
            "selector": "*.*"
         } 
-        ```    
-
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;and now, your can use CMD+B to scp to server.
+        ```
 * replace {PATH} to your local path, change "\*.vm" to add or replace your file format;
 * options:
     * `-f` scp the hole directory, by default ignore ".svn", ".git" and ".scp_config";
