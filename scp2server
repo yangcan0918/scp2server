@@ -7,6 +7,9 @@
 # param: -c used to create a '.scp_config' sample file under current path.
 # 
 # Author: wsvn53@gmail.com
+#
+# TODO: 
+# 1. support svn or git ignore .scp_config when it be generated.
 
 # env variable
 PATH_CUR=`pwd`
@@ -31,7 +34,7 @@ function scp2serv()
 {
     PATH_FILE=$1
     REL_PATH=${PATH_FILE##*$SCP_FROM_ROOT}
-    REMOTE_DIRNAME=`dirname $SCP_TO_ROOT$REL_PATH`
+    REMOTE_DIRNAME=`dirname "$SCP_TO_ROOT$REL_PATH"`
     INTERACT="set timeout 30\nexpect {\n \"*assword*\" {\n send \"$SCP_PASS\\\\n\"\n exp_continue \n }\n \"dev/null\" {\n exit \n} \"fingerprint\" {\n send \"yes\\\\n\" \n send_user \"\\\\nadd fingerprint to known_hosts\" \n \n exp_continue \n} \n timeout {\n send_user \"Timeout. abort.\\\\n\" \n exit \n } \n }"
     if [[ $DEBUG_MODE -eq 1 ]];then
         HIDE_STR="SCP2SERVER_IS_RUNNING_IN_DEBUG_MODE"
@@ -41,10 +44,10 @@ function scp2serv()
     fi
     # mkdir on remote server
     if [[ $DEBUG_MODE -eq 1 ]];then echo "1) run 'mkdir -p' to create full path if not exsit";fi
-    echo "set timeout 60\n spawn ssh $SCP_USER@$SCP_HOST \"mkdir -p $REMOTE_DIRNAME 2 >> /dev/null\"\n $INTERACT" | expect | grep -v "$HIDE_STR"
+    echo "set timeout 60\n spawn ssh $SCP_USER@$SCP_HOST \"mkdir -p \\\"${REMOTE_DIRNAME}\\\" 2 >> /dev/null\"\n $INTERACT" | expect | grep -v "$HIDE_STR"
     # scp to server
     if [[ $DEBUG_MODE -eq 1 ]];then echo "2) run scp to copy file to server";fi
-    echo "spawn scp $PATH_FILE $SCP_USER@$SCP_HOST:$SCP_TO_ROOT$REL_PATH\n $INTERACT" | expect | grep -v "$HIDE_STR"
+    echo "spawn scp \"${PATH_FILE}\" $SCP_USER@$SCP_HOST:\"${SCP_TO_ROOT/ /\\\\ }${REL_PATH/ /\\\\ }\"\n $INTERACT" | expect | grep -v "$HIDE_STR"
 }
 
 # no parameter, just create a .scp_config file
@@ -79,7 +82,7 @@ do
         SCP_CONFIG="$PATH_CUR/.scp_config"
         break
     else
-        PATH_CUR=`cd $PATH_CUR;cd ..;echo $PWD`
+        PATH_CUR=`cd "$PATH_CUR";cd ..;echo $PWD`
     fi
 done
 
@@ -91,7 +94,7 @@ if [[ "$SCP_CONFIG" != "" ]]; then
     SCP_USER=$scp_user
     SCP_PASS=$scp_password
     SCP_FROM_ROOT=$scp_from
-    SCP_FROM_ROOT=$(cd `dirname $SCP_CONFIG`;cd $SCP_FROM_ROOT;echo $PWD)
+    SCP_FROM_ROOT=$(cd "`dirname $SCP_CONFIG`";cd "$SCP_FROM_ROOT";echo $PWD)
     SCP_TO_ROOT=$scp_to
     DEBUG_MODE=$debug_mode
     PATH_CUR=$PWD
@@ -100,11 +103,11 @@ if [[ "$SCP_CONFIG" != "" ]]; then
         for FILE in `find $SCP_FROM_ROOT | grep -v "$IGNORE_MATCH" | grep "$EXT_MATCH"`
         do
             if [ -f $FILE ];then
-                scp2serv $FILE
+                scp2serv "$FILE"
             fi
         done
     else
-        scp2serv $PATH_FILE
+        scp2serv "$PATH_FILE"
     fi
     echo ">>---------------------------------Done------------------------------------<<"
     exit 0
