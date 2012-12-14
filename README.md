@@ -10,8 +10,19 @@
     * `scp.from` evaluate relative path of file depend on this item. it start with the relative path of `.scp_config` file;
     * `scp.to` the path you want to place, root of your build path;
     * `debug.mode` set to `1` will display more informations;
-* edit your .gvimrc or .vimrc to add the this line:
-    * `au BufWritePost \*.vm exec "!{PATH}/scp2server %"`
+* link your scp2server to $PATH
+    * `sudo ln -s {PATH_OF_YOUR_CMD}/scp2server /usr/sbin/scp2server`
+* connect with your editor:
+    * *VIM* `au BufWritePost \*.vm exec "!scp2server %"`
+    * *Sublime Text 2* `Tools` > `Build System` > `New Build System`, and then copy the following code to your editor and save:
+      ```javascript
+      {
+       	"cmd": ["scp2server", "${file_name}"],
+       	"working_dir": "${file_path}",
+       	"selector": "*.*"
+      }
+      ```
+      and now, your can use CMD+B to scp to server.
 * replace {PATH} to your local path, change "\*.vm" to add or replace your file format;
 * options:
     * `-f` scp the hole directory, by default ignore ".svn", ".git" and ".scp_config";
