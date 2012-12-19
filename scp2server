@@ -22,7 +22,13 @@ DEBUG_MODE=0
 function create_scp_config()
 {
     if [ ! -f ".scp_config" ];then
-        echo "scp.host=sample.scp2server.com\nscp.user=root\nscp.password=samplepassword\nscp.from=./\nscp.to=/root/sample/\debug.mode=0" >> .scp_config
+        SCP_CONFIG_SAMPLE=("scp.host=sample.scp2server.com
+            \nscp.user=root
+            \nscp.password=samplepassword
+            \nscp.from=./
+            \nscp.to=/root/sample/
+            \ndebug.mode=0")
+        echo $SCP_CONFIG_SAMPLE>> .scp_config
         echo "File '.scp_config' created."
         exit 0
     else
