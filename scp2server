@@ -79,7 +79,6 @@ fi
 # read options
 while getopts "fi:e:hc" OPTNAME
 do
-    echo $OPTNAME
     case $OPTNAME in
         f) FULL_COPY=1;;
         i) IGNORE_MATCH=$OPTARG;;
