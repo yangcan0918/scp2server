@@ -29,6 +29,7 @@
     * `-i {SOME_PATTERN}` use this option to ignore some files to scp when `-f` specified;
     * `-e {SOME_PATTERN}` use this option to filter some files to scp when `-f` specified;
     * `-c` use this option to create a `.scp_config` sample file under current directory;
+    * `-p` use `mkdir -p` to create full path if remote path not exist.
 * examples:
     * `scp2server` or `scp2server -c` create a `.scp_config` sample file;
     * `scp2server ./index.html` copy index.html file to remote server;

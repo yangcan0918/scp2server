@@ -5,11 +5,13 @@
 # param: -i used to ignore files when use -f.
 # param: -e used to allow files with specifid extensions.
 # param: -c used to create a '.scp_config' sample file under current path.
+# param: -p create full path if remote path not exist.
 # 
 # Author: wsvn53@gmail.com
 #
 # TODO: 
-# 1. support svn or git ignore .scp_config when it be generated.
+# 1. support svn or git ignore .scp_config when it be generated;
+# 2. use `rsync` copy the hole directory; [*]
 
 # env variable
 PATH_CUR=`pwd`
@@ -18,6 +20,42 @@ SCP_CONFIG=""
 PATH_FILE="$PATH_CUR/$1"
 FULL_COPY=0
 DEBUG_MODE=0
+EXEC_FILE=$0
+EXEC_ARGS=$@
+
+function interact_str()
+{
+    INTERACT=("
+    set timeout 30
+    expect {
+        \"*assword*\" { 
+            send \"$SCP_PASS\\\\n\"
+            exp_continue
+        } 
+        \"dev/null\" {
+            exit
+        }
+        \"fingerprint\" {
+            send \"yes\\\\n\"
+            send_user \"\\\\nadd fingerprint to known_hosts\"
+            exp_continue
+        }
+        \"try again\" {
+            send_user \"****** error: invalid password ******\\\\n\"
+            exit
+        }
+        \"*o such file or directory\" {
+            send_user \"REMOTE_PATH_NOT_EXIST\\\\n\"
+            send_user \"Making dirs and retrying..\\\\n\"
+            send_user [exec $EXEC_FILE -p $EXEC_ARGS]
+            exit
+        }
+        timeout {
+            send_user \"Timeout. abort.\\\\n\"
+            exit
+        }
+    }")
+}
 
 function create_scp_config()
 {
@@ -36,81 +74,22 @@ function create_scp_config()
     fi
 }
 
-function scp2serv()
+function detect_config()
 {
-    PATH_FILE=$1
-    REL_PATH=${PATH_FILE##*$SCP_FROM_ROOT}
-    REMOTE_DIRNAME=`dirname "$SCP_TO_ROOT$REL_PATH"`
-    INTERACT=("
-    set timeout 30\n
-    expect {\n
-        \"*assword*\" {\n 
-            send \"$SCP_PASS\\\\n\"\n
-            exp_continue \n
-        }\n 
-        \"dev/null\" {\n
-            exit \n
-        }
-        \"fingerprint\" {\n
-            send \"yes\\\\n\" \n
-            send_user \"\\\\nadd fingerprint to known_hosts\" \n
-            exp_continue \n
-        } \n
-        timeout {\n
-            send_user \"Timeout. abort.\\\\n\" \n
-            exit \n
-        } \n
-    }")
-    if [[ $DEBUG_MODE -eq 1 ]];then
-        HIDE_STR="SCP2SERVER_IS_RUNNING_IN_DEBUG_MODE"
-        echo $HIDE_STR
-    else
-        HIDE_STR="ssh\|$SCP_USER\|$SCP_HOST\|yes/no\|fingerprint"
-    fi
-    # mkdir on remote server
-    if [[ $DEBUG_MODE -eq 1 ]];then echo "1) run 'mkdir -p' to create full path if not exsit";fi
-    echo "set timeout 60\n spawn ssh $SCP_USER@$SCP_HOST \"mkdir -p \\\"${REMOTE_DIRNAME}\\\" 2 >> /dev/null\"\n $INTERACT" | expect | grep -v "$HIDE_STR"
-    # scp to server
-    if [[ $DEBUG_MODE -eq 1 ]];then echo "2) run scp to copy file to server";fi
-    echo "spawn scp \"${PATH_FILE}\" $SCP_USER@$SCP_HOST:\"${SCP_TO_ROOT/ /\\\\ }${REL_PATH/ /\\\\ }\"\n $INTERACT" | expect | grep -v "$HIDE_STR"
+    # detect .scp_config file
+    while [[ "$PATH_CUR" != "$PATH_USR" ]]
+    do
+        if [ -f "$PATH_CUR/.scp_config" ]; then
+            SCP_CONFIG="$PATH_CUR/.scp_config"
+            break
+        else
+            PATH_CUR=`cd "$PATH_CUR";cd ..;echo $PWD`
+        fi
+    done
 }
 
-# no parameter, just create a .scp_config file
-if [ $# = 0 ];then
-    create_scp_config
-    echo "Nothing to do."
-    exit 0
-fi
-
-# read options
-while getopts "fi:e:hc" OPTNAME
-do
-    case $OPTNAME in
-        f) FULL_COPY=1;;
-        i) IGNORE_MATCH=$OPTARG;;
-        e) EXT_MATCH=$OPTARG;;
-        c) create_scp_config;exit 0;;
-    esac
-done
-
-# --ignore parameter
-if [[ "$IGNORE_MATCH" = "" ]];then
-    IGNORE_MATCH="/\.git\|/\.svn"
-fi
-IGNORE_MATCH=$IGNORE_MATCH"\|/\.scp_config"
-
-# detect .scp_config file
-while [[ "$PATH_CUR" != "$PATH_USR" ]]
-do
-    if [ -f "$PATH_CUR/.scp_config" ]; then
-        SCP_CONFIG="$PATH_CUR/.scp_config"
-        break
-    else
-        PATH_CUR=`cd "$PATH_CUR";cd ..;echo $PWD`
-    fi
-done
-
-if [[ "$SCP_CONFIG" != "" ]]; then
+function read_config()
+{
     echo "Found .scp_config at: $SCP_CONFIG"
     CONFIG_VARS=`sed "s/\./_/" $SCP_CONFIG | sed "s/\.root=/=/"`
     export $CONFIG_VARS
@@ -121,18 +100,91 @@ if [[ "$SCP_CONFIG" != "" ]]; then
     SCP_FROM_ROOT=$(cd "`dirname $SCP_CONFIG`";cd "$SCP_FROM_ROOT";echo $PWD)
     SCP_TO_ROOT=$scp_to
     DEBUG_MODE=$debug_mode
-    PATH_CUR=$PWD
-    # if --full 
     if [[ $FULL_COPY -eq 1 ]];then
-        for FILE in `find $SCP_FROM_ROOT | grep -v "$IGNORE_MATCH" | grep "$EXT_MATCH"`
-        do
-            if [ -f $FILE ];then
-                scp2serv "$FILE"
-            fi
-        done
+        REL_PATH=${PATH_FILE##*$SCP_FROM_ROOT}
     else
-        scp2serv "$PATH_FILE"
+        REL_PATH=${PATH_FILE##*$SCP_FROM_ROOT}
     fi
+    REMOTE_DIRNAME=`dirname "$SCP_TO_ROOT$REL_PATH"`
+    # tidy path // to /
+    PATH_FILE=${PATH_FILE/\/\//\/}
+    REMOTE_PATH=${SCP_TO_ROOT/ /\\\\ }${REL_PATH/ /\\\\ }
+    REMOTE_PATH=${REMOTE_PATH/\/\//\/}
+    # DEBUG_MODE=1
+    if [[ $DEBUG_MODE -eq 1 ]];then
+        HIDE_STR="SCP2SERVER_IS_RUNNING_IN_DEBUG_MODE"
+        echo $HIDE_STR
+    else
+        HIDE_STR="rsync|$SCP_USER|$SCP_HOST|yes/no|fingerprint|building|^\s$"
+    fi
+
+    # --ignore parameter
+    if [[ "$IGNORE_MATCH" = "" ]];then
+        IGNORE_MATCH=".git|.svn"
+    fi
+    IGNORE_MATCH="$IGNORE_MATCH|.scp_config"
+    IGNORE_MATCH="--exclude \"${IGNORE_MATCH//\|/\" --exclude \"}\""
+}
+
+function mkdir_full()
+{
+    detect_config
+    if [[ "$SCP_CONFIG" != "" ]]; then
+        read_config
+        interact_str
+        # if remote_path is a file type, get its dirname
+        if [ -d "${PATH_FILE}" ]; then
+            DIR_CREATE=${REMOTE_PATH}
+        else
+            DIR_CREATE=`dirname ${REMOTE_PATH}`
+        fi
+        echo "spawn ssh $SCP_USER@$SCP_HOST \"mkdir -p \\\"${DIR_CREATE}\\\">>/dev/null\"\n$INTERACT" | expect | grep -Ev "$HIDE_STR" 
+        scp2serv
+    fi
+    exit 0
+}
+
+function scp2serv()
+{
+    # rsync to server
+    if [[ $DEBUG_MODE -eq 1 ]];then echo "Running 'rsync':";fi
+    interact_str
+    if [ -d "${PATH_FILE}" ]; then PATH_FILE="$PATH_FILE/";fi
+    echo "spawn rsync -av \"${PATH_FILE}\" $SCP_USER@$SCP_HOST:\"${REMOTE_PATH}\" $IGNORE_MATCH\n$INTERACT" | expect | grep -Ev "$HIDE_STR" 
+    ## scp to server
+    # if [[ $DEBUG_MODE -eq 1 ]];then echo "2) run scp to copy file to server";fi
+    # echo "spawn scp \"${PATH_FILE}\" $SCP_USER@$SCP_HOST:\"${SCP_TO_ROOT/ /\\\\ }${REL_PATH/ /\\\\ }\"\n $INTERACT" | expect | grep -v "$HIDE_STR"
+}
+
+# no parameter, just create a .scp_config file
+if [ $# = 0 ];then
+    create_scp_config
+    echo "Nothing to do."
+    exit 0
+fi
+
+# read options
+while getopts "fi:e:hcp" OPTNAME
+do
+    case $OPTNAME in
+        f) FULL_COPY=1;PATH_FILE=$PATH_CUR;;
+        i) IGNORE_MATCH=$OPTARG;;
+        e) EXT_MATCH=$OPTARG;;
+        c) create_scp_config;exit 0;;
+        p) MKDIR_PATH=1;PATH_FILE=$PATH_CUR/`echo "$@"|cut -d " " -f$OPTIND`;;
+    esac
+done
+
+if [[ "$MKDIR_PATH" = "1" ]]; then
+    mkdir_full
+fi
+
+detect_config
+
+if [[ "$SCP_CONFIG" != "" ]]; then
+    read_config
+    PATH_CUR=$PWD
+    scp2serv
     echo ">>---------------------------------Done------------------------------------<<"
     exit 0
 fi
