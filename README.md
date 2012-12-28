@@ -34,8 +34,8 @@
     * `scp2server` or `scp2server -c` create a `.scp_config` sample file;
     * `scp2server ./index.html` copy index.html file to remote server;
     * `scp2server -f` copy all files in current directory to remote server;
-    * `scp2server -f -i "/\.vim\|\.bak\|\.swp\|\.less"` copy all files in current directory to remote server exclude ".vim", ".bak", ".swp", ".less" files;
-    * `scp2server -f -e "\.htm\|\.css"` copy all .htm and .css files in current directory to remote server;
+    * `scp2server -f -i ".vim\|.bak\|.swp\|.less"` copy all files in current directory to remote server exclude ".vim", ".bak", ".swp", ".less" files;
+    * `scp2server -f -e ".htm\|.css"` copy all .htm and .css files in current directory to remote server;
 
 ## Have fun..
 enjoy it. waiting for 12/21/2012.
