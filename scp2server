@@ -186,5 +186,8 @@ if [[ "$SCP_CONFIG" != "" ]]; then
     PATH_CUR=$PWD
     scp2serv
     echo ">>---------------------------------Done------------------------------------<<"
-    exit 0
+else
+    echo "can not found .scp_config"
 fi
+
+exit 0
