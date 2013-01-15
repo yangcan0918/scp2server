@@ -9,6 +9,7 @@
     * `scp.password` password for access server;
     * `scp.from` evaluate relative path of file depend on this item. it start with the relative path of `.scp_config` file;
     * `scp.to` the path you want to place, root of your build path;
+    * `scp.execute` you can use 'rsync' or 'scp' to execute;
     * `debug.mode` set to `1` will display more informations;
 * link your scp2server to $PATH
     * `sudo ln -s {PATH_OF_YOUR_CMD}/scp2server /usr/sbin/scp2server`

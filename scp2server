@@ -12,6 +12,8 @@
 # TODO: 
 # 1. support svn or git ignore .scp_config when it be generated;
 # 2. use `rsync` copy the hole directory; [*]
+# 3. can config use scp or rsync, default is rsync; [*]
+# 3. can config operation timeout(s), default is 30; [*]
 
 # env variable
 PATH_CUR=`pwd`
@@ -25,8 +27,9 @@ EXEC_ARGS=$@
 
 function interact_str()
 {
+    if [[ "$SCP_TIMEOUT" = "" ]];then SCP_TIMEOUT=30;fi
     INTERACT=("
-    set timeout 30
+    set timeout $SCP_TIMEOUT
     expect {
         \"*assword*\" { 
             send \"$SCP_PASS\\\\n\"
@@ -65,6 +68,8 @@ function create_scp_config()
             \nscp.password=samplepassword
             \nscp.from=./
             \nscp.to=/root/sample/
+            \nscp.execute=rsync
+            \nscp.timeout=30
             \ndebug.mode=0")
         echo $SCP_CONFIG_SAMPLE>> .scp_config
         echo "File '.scp_config' created."
@@ -99,6 +104,8 @@ function read_config()
     SCP_FROM_ROOT=$scp_from
     SCP_FROM_ROOT=$(cd "`dirname $SCP_CONFIG`";cd "$SCP_FROM_ROOT";echo $PWD)
     SCP_TO_ROOT=$scp_to
+    SCP_EXECUTE=$scp_execute
+    SCP_TIMEOUT=$scp_timeout
     DEBUG_MODE=$debug_mode
     if [[ $FULL_COPY -eq 1 ]];then
         REL_PATH=${PATH_FILE##*$SCP_FROM_ROOT}
@@ -147,13 +154,16 @@ function mkdir_full()
 function scp2serv()
 {
     # rsync to server
-    if [[ $DEBUG_MODE -eq 1 ]];then echo "Running 'rsync':";fi
     interact_str
     if [ -d "${PATH_FILE}" ]; then PATH_FILE="$PATH_FILE/";fi
-    echo "spawn rsync -av \"${PATH_FILE}\" $SCP_USER@$SCP_HOST:\"${REMOTE_PATH}\" $IGNORE_MATCH\n$INTERACT" | expect | grep -Ev "$HIDE_STR" 
-    ## scp to server
-    # if [[ $DEBUG_MODE -eq 1 ]];then echo "2) run scp to copy file to server";fi
-    # echo "spawn scp \"${PATH_FILE}\" $SCP_USER@$SCP_HOST:\"${SCP_TO_ROOT/ /\\\\ }${REL_PATH/ /\\\\ }\"\n $INTERACT" | expect | grep -v "$HIDE_STR"
+    if [[ "$SCP_EXECUTE" = "scp" ]]; then
+        # scp to server
+        if [[ $DEBUG_MODE -eq 1 ]];then echo "Running 'scp':";fi
+        echo "spawn scp \"${PATH_FILE}\" $SCP_USER@$SCP_HOST:\"${REMOTE_PATH}\"\n $INTERACT" | expect | grep -v "$HIDE_STR"
+    else
+        if [[ $DEBUG_MODE -eq 1 ]];then echo "Running 'rsync':";fi
+        echo "spawn rsync -av \"${PATH_FILE}\" $SCP_USER@$SCP_HOST:\"${REMOTE_PATH}\" $IGNORE_MATCH\n$INTERACT" | expect | grep -Ev "$HIDE_STR" 
+    fi
 }
 
 # no parameter, just create a .scp_config file
